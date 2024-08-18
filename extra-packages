@@ -11,6 +11,7 @@ eza
 ffmpeg
 fzf
 github-cli
+go
 helix
 just
 make
