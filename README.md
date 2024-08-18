@@ -2,11 +2,8 @@
 
 ## Description
 
-boxkit is a set of GitHub actions and skeleton files to build toolbox and distrobox images. Basically, clone this repo, make the changes you want, and then build what you need. Some examples include:
+boxkit is a set of GitHub actions and skeleton files to build toolbox and distrobox images. Basically, clone this repo, make the changes you want, and then build what you need.
 
-- [DaVinci Box](https://github.com/zelikos/davincibox) - Container for DaVinci Resolve installation and runtime dependencies on Linux
-- [obs-studio-portable](https://github.com/ublue-os/obs-studio-portable) - OCI container image of OBS Studio that bundles a curated collection of 3rd party plugins
-- [bazzite-arch](https://github.com/ublue-os/bazzite-arch) - A ready-to-game Arch Linux based OCI designed for use exclusively in distrobox
 
 ## Boxkit Alpine Example
 
@@ -21,11 +18,6 @@ If you use distrobox:
     distrobox create -i ghcr.io/ublue-os/boxkit -n boxkit
     distrobox enter boxkit
     
-If you use toolbx:
-
-    toolbox create -i ghcr.io/ublue-os/boxkit -c boxkit
-    toolbox enter boxkit
-
 ### Pull down your config
 
 Use `chezmoi` to pull down your dotfiles and set up git sync.
@@ -52,12 +44,4 @@ These are a set of mostly-stock images with packages needed to run as a toolbox/
 
 Try to derive your blingbox from those base images so we can all help maintain them over time, you can't have bling without good stock!
 
-Tag your image with `boxkit` to share with others!
 
-## [![Repography logo](https://images.repography.com/logo.svg)](https://repography.com) / Recent activity [![Time period](https://images.repography.com/35181738/ublue-os/boxkit/recent-activity/9_nHJKzKdmCsGzSsdjbuHqS2t9mY6ijnFHQGQSEWtW0/lgGy5XEcVYQ14vma9bwaPOYJFIxlNmj5nK3-CFQQkgc_badge.svg)](https://repography.com)
-[![Timeline graph](https://images.repography.com/35181738/ublue-os/boxkit/recent-activity/9_nHJKzKdmCsGzSsdjbuHqS2t9mY6ijnFHQGQSEWtW0/lgGy5XEcVYQ14vma9bwaPOYJFIxlNmj5nK3-CFQQkgc_timeline.svg)](https://github.com/ublue-os/boxkit/commits)
-[![Issue status graph](https://images.repography.com/35181738/ublue-os/boxkit/recent-activity/9_nHJKzKdmCsGzSsdjbuHqS2t9mY6ijnFHQGQSEWtW0/lgGy5XEcVYQ14vma9bwaPOYJFIxlNmj5nK3-CFQQkgc_issues.svg)](https://github.com/ublue-os/boxkit/issues)
-[![Pull request status graph](https://images.repography.com/35181738/ublue-os/boxkit/recent-activity/9_nHJKzKdmCsGzSsdjbuHqS2t9mY6ijnFHQGQSEWtW0/lgGy5XEcVYQ14vma9bwaPOYJFIxlNmj5nK3-CFQQkgc_prs.svg)](https://github.com/ublue-os/boxkit/pulls)
-[![Trending topics](https://images.repography.com/35181738/ublue-os/boxkit/recent-activity/9_nHJKzKdmCsGzSsdjbuHqS2t9mY6ijnFHQGQSEWtW0/lgGy5XEcVYQ14vma9bwaPOYJFIxlNmj5nK3-CFQQkgc_words.svg)](https://github.com/ublue-os/boxkit/commits)
-[![Top contributors](https://images.repography.com/35181738/ublue-os/boxkit/recent-activity/9_nHJKzKdmCsGzSsdjbuHqS2t9mY6ijnFHQGQSEWtW0/lgGy5XEcVYQ14vma9bwaPOYJFIxlNmj5nK3-CFQQkgc_users.svg)](https://github.com/ublue-os/boxkit/graphs/contributors)
-[![Activity map](https://images.repography.com/35181738/ublue-os/boxkit/recent-activity/9_nHJKzKdmCsGzSsdjbuHqS2t9mY6ijnFHQGQSEWtW0/lgGy5XEcVYQ14vma9bwaPOYJFIxlNmj5nK3-CFQQkgc_map.svg)](https://github.com/ublue-os/boxkit/commits)
