@@ -14,3 +14,7 @@ app/build/
 *.keystore
 !debug.keystore
 .kotlin/
+
+# Signing material — never commit
+keystore.properties
+*.jks
