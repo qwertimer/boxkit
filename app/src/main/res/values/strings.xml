@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Forge</string>
+
+    <string name="channel_reminder_name">Workout reminders</string>
+    <string name="channel_reminder_desc">The polite first nudge on a training day.</string>
+    <string name="channel_nag_name">Escalating nags</string>
+    <string name="channel_nag_desc">Repeat reminders that get louder until the session is logged.</string>
+    <string name="channel_enforce_name">Enforcement alarm</string>
+    <string name="channel_enforce_desc">Full-screen alarm that cannot be dismissed without logging.</string>
+</resources>

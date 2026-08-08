@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <!--
+        As with the legacy backup rules: the database is the only thing named, so the API key held
+        in settings.preferences_pb never leaves the device.
+    -->
+    <cloud-backup>
+        <include
+            domain="database"
+            path="forge.db" />
+    </cloud-backup>
+    <device-transfer>
+        <include
+            domain="database"
+            path="forge.db" />
+    </device-transfer>
+</data-extraction-rules>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!--
+        Only the diary and training history are backed up. Naming the database as the sole
+        include means everything else — in particular the Gemini API key in
+        settings.preferences_pb — is excluded by construction rather than by an explicit rule.
+    -->
+    <include
+        domain="database"
+        path="forge.db" />
+</full-backup-content>
