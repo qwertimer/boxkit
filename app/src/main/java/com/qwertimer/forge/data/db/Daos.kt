@@ -134,34 +134,80 @@ interface ExerciseDao {
 @Dao
 interface WorkoutDao {
 
+    /**
+     * Every session on a date, the programmed one first. Ordering on `origin` directly would sort
+     * alphabetically and put AD_HOC above SCHEDULED, so the intent is spelled out.
+     */
     @Transaction
-    @Query("SELECT * FROM workout_plans WHERE epochDay = :epochDay LIMIT 1")
-    fun planForDay(epochDay: Long): Flow<PlanWithBlocks?>
+    @Query(
+        """
+        SELECT * FROM workout_plans
+        WHERE epochDay = :epochDay
+        ORDER BY CASE origin WHEN 'SCHEDULED' THEN 0 ELSE 1 END, id
+        """,
+    )
+    fun plansForDay(epochDay: Long): Flow<List<PlanWithBlocks>>
 
     @Transaction
-    @Query("SELECT * FROM workout_plans WHERE epochDay = :epochDay LIMIT 1")
-    suspend fun planForDayOnce(epochDay: Long): PlanWithBlocks?
+    @Query("SELECT * FROM workout_plans WHERE id = :planId")
+    suspend fun planById(planId: Long): PlanWithBlocks?
 
-    @Query("SELECT epochDay, status FROM workout_plans WHERE epochDay >= :from ORDER BY epochDay")
-    fun statusesSince(from: Long): Flow<List<PlanStatusRow>>
+    @Transaction
+    @Query(
+        """
+        SELECT * FROM workout_plans
+        WHERE epochDay = :epochDay AND origin = 'SCHEDULED'
+        LIMIT 1
+        """,
+    )
+    fun scheduledPlanForDay(epochDay: Long): Flow<PlanWithBlocks?>
 
-    @Query("SELECT epochDay, status FROM workout_plans WHERE epochDay >= :from ORDER BY epochDay")
-    suspend fun statusesSinceOnce(from: Long): List<PlanStatusRow>
+    @Transaction
+    @Query(
+        """
+        SELECT * FROM workout_plans
+        WHERE epochDay = :epochDay AND origin = 'SCHEDULED'
+        LIMIT 1
+        """,
+    )
+    suspend fun scheduledPlanForDayOnce(epochDay: Long): PlanWithBlocks?
 
-    @Query("SELECT MIN(epochDay) FROM workout_plans")
-    suspend fun firstPlanDay(): Long?
+    /** Highest variant used on a date, so the next session on that date differs from all of them. */
+    @Query("SELECT COALESCE(MAX(variant), -1) FROM workout_plans WHERE epochDay = :epochDay")
+    suspend fun maxVariantForDay(epochDay: Long): Int
 
-    /** Exercise ids from the most recent [planLimit] sessions, used to steer variety. */
+    // Only the programmed session can be missed or skipped, so compliance ignores everything else.
+    @Query(
+        """
+        SELECT epochDay, status FROM workout_plans
+        WHERE epochDay >= :from AND origin = 'SCHEDULED'
+        ORDER BY epochDay
+        """,
+    )
+    fun scheduledStatusesSince(from: Long): Flow<List<PlanStatusRow>>
+
+    @Query(
+        """
+        SELECT COUNT(*) FROM workout_plans
+        WHERE epochDay >= :from AND origin = 'AD_HOC' AND status = 'COMPLETED'
+        """,
+    )
+    fun bonusCompletedSince(from: Long): Flow<Int>
+
+    /**
+     * Exercise ids from the most recent [planLimit] sessions, used to steer variety. Sessions on
+     * [onEpochDay] itself count too, so a second session in a day does not repeat the first.
+     */
     @Query(
         """
         SELECT DISTINCT b.exerciseId FROM workout_blocks b
         WHERE b.planId IN (
-            SELECT id FROM workout_plans WHERE epochDay < :beforeEpochDay
-            ORDER BY epochDay DESC LIMIT :planLimit
+            SELECT id FROM workout_plans WHERE epochDay <= :onEpochDay
+            ORDER BY epochDay DESC, id DESC LIMIT :planLimit
         )
         """,
     )
-    suspend fun recentExerciseIds(beforeEpochDay: Long, planLimit: Int = 2): List<String>
+    suspend fun recentExerciseIds(onEpochDay: Long, planLimit: Int = 2): List<String>
 
     @Insert
     suspend fun insertPlan(plan: WorkoutPlanEntity): Long
@@ -169,8 +215,8 @@ interface WorkoutDao {
     @Insert
     suspend fun insertBlocks(blocks: List<WorkoutBlockEntity>)
 
-    @Query("DELETE FROM workout_plans WHERE epochDay = :epochDay")
-    suspend fun deletePlanForDay(epochDay: Long)
+    @Query("DELETE FROM workout_plans WHERE id = :planId")
+    suspend fun deletePlan(planId: Long)
 
     @Query("UPDATE workout_blocks SET completed = :completed WHERE id = :blockId")
     suspend fun setBlockCompleted(blockId: Long, completed: Boolean)
@@ -178,9 +224,12 @@ interface WorkoutDao {
     @Query("UPDATE workout_plans SET status = :status, skipReason = :reason, closedAt = :closedAt WHERE id = :planId")
     suspend fun setPlanStatus(planId: Long, status: PlanStatus, reason: String?, closedAt: Long?)
 
+    /** Write a plan and its blocks together, so a session is never half-persisted. */
     @Transaction
-    suspend fun replacePlan(plan: WorkoutPlanEntity, blocks: (Long) -> List<WorkoutBlockEntity>): Long {
-        deletePlanForDay(plan.epochDay)
+    suspend fun insertPlanWithBlocks(
+        plan: WorkoutPlanEntity,
+        blocks: (Long) -> List<WorkoutBlockEntity>,
+    ): Long {
         val id = insertPlan(plan)
         insertBlocks(blocks(id))
         return id

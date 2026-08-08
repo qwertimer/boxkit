@@ -11,7 +11,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Casino
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -19,6 +21,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -55,20 +58,17 @@ fun WorkoutScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val stats by viewModel.stats.collectAsStateWithLifecycle()
-    var skipDialog by remember { mutableStateOf(false) }
+    var skipTarget by remember { mutableStateOf<Long?>(null) }
 
     Scaffold(
         modifier = modifier,
-        topBar = {
-            TopAppBar(
-                title = { Text("Today's session") },
-                actions = {
-                    if (state.plan?.status == PlanStatus.PENDING) {
-                        IconButton(onClick = viewModel::regenerate) {
-                            Icon(Icons.Default.Refresh, contentDescription = "New routine")
-                        }
-                    }
-                },
+        topBar = { TopAppBar(title = { Text("Training") }) },
+        floatingActionButton = {
+            // Always available. A rest day is a default, not a rule, and some days you want two.
+            ExtendedFloatingActionButton(
+                onClick = viewModel::addSession,
+                icon = { Icon(Icons.Default.Add, contentDescription = null) },
+                text = { Text(if (state.sessions.isEmpty()) "Train anyway" else "Add session") },
             )
         },
     ) { padding ->
@@ -80,115 +80,130 @@ fun WorkoutScreen(
                 contentAlignment = Alignment.Center,
             ) { CircularProgressIndicator() }
 
-            state.plan == null -> RestDay(
+            else -> LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding),
-            )
+                contentPadding = PaddingValues(bottom = 96.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                if (state.sessions.isEmpty()) {
+                    item { RestDay(isRestDay = state.isRestDay) }
+                }
 
-            else -> PlanContent(
-                plan = state.plan!!,
-                streak = stats?.currentStreak ?: 0,
-                onToggle = viewModel::toggleBlock,
-                onComplete = viewModel::markComplete,
-                onSkipRequest = { skipDialog = true },
-                contentPadding = padding,
-            )
+                state.sessions.forEach { plan ->
+                    item(key = "head-${plan.id}") {
+                        SessionHeader(
+                            plan = plan,
+                            streak = stats?.currentStreak ?: 0,
+                            onReroll = { viewModel.reroll(plan.id) },
+                            onDelete = { viewModel.deleteSession(plan.id) },
+                        )
+                    }
+
+                    BlockType.entries.forEach { type ->
+                        val blocks = plan.blocks.filter { it.blockType == type }
+                        if (blocks.isEmpty()) return@forEach
+                        item(key = "sec-${plan.id}-$type") { SectionHeader(type.label) }
+                        items(blocks, key = { it.id }) { block ->
+                            BlockRow(block, enabled = plan.status == PlanStatus.PENDING) { checked ->
+                                viewModel.toggleBlock(block.id, checked)
+                            }
+                        }
+                    }
+
+                    if (plan.status == PlanStatus.PENDING) {
+                        item(key = "actions-${plan.id}") {
+                            Column(
+                                Modifier.padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Button(
+                                    onClick = { viewModel.markComplete(plan.id) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) { Text("Mark session complete") }
+
+                                // Only the programmed session can be "skipped" — an extra session
+                                // you decide against is simply deleted, with nothing to explain.
+                                if (plan.isScheduled) {
+                                    OutlinedButton(
+                                        onClick = { skipTarget = plan.id },
+                                        modifier = Modifier.fillMaxWidth(),
+                                    ) { Text("Skip today") }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
-    if (skipDialog) {
+    skipTarget?.let { planId ->
         SkipDialog(
-            onDismiss = { skipDialog = false },
+            onDismiss = { skipTarget = null },
             onConfirm = { reason ->
-                viewModel.skip(reason)
-                skipDialog = false
+                viewModel.skip(planId, reason)
+                skipTarget = null
             },
         )
     }
 }
 
 @Composable
-private fun PlanContent(
+private fun SessionHeader(
     plan: WorkoutPlan,
     streak: Int,
-    onToggle: (Long, Boolean) -> Unit,
-    onComplete: () -> Unit,
-    onSkipRequest: () -> Unit,
-    contentPadding: PaddingValues,
+    onReroll: () -> Unit,
+    onDelete: () -> Unit,
 ) {
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(contentPadding),
-        contentPadding = PaddingValues(bottom = 32.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        item {
-            Card(Modifier.padding(16.dp)) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column {
-                            Text(
-                                plan.focus.label,
-                                style = MaterialTheme.typography.headlineSmall,
-                                fontWeight = FontWeight.Bold,
-                            )
-                            Text(
-                                "~${plan.estimatedMinutes} min · ${plan.blocks.size} movements",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        when (plan.status) {
-                            PlanStatus.COMPLETED -> Pill("Done")
-                            PlanStatus.SKIPPED -> Pill("Skipped")
-                            PlanStatus.PENDING -> if (streak > 0) Pill("$streak-day streak")
-                        }
-                    }
-
-                    LinearProgressIndicator(
-                        progress = { plan.progress },
-                        modifier = Modifier.fillMaxWidth(),
+    Card(Modifier.padding(16.dp)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        plan.focus.label,
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
                     )
-
-                    plan.skipReason?.let {
-                        Text(
-                            "Skipped: $it",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                    }
+                    Text(
+                        "~${plan.estimatedMinutes} min · ${plan.blocks.size} movements",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                when {
+                    plan.status == PlanStatus.COMPLETED -> Pill("Done")
+                    plan.status == PlanStatus.SKIPPED -> Pill("Skipped")
+                    !plan.isScheduled -> Pill("Extra")
+                    streak > 0 -> Pill("$streak-day streak")
                 }
             }
-        }
 
-        BlockType.entries.forEach { type ->
-            val blocks = plan.blocks.filter { it.blockType == type }
-            if (blocks.isEmpty()) return@forEach
-            item(key = "header-$type") { SectionHeader(type.label) }
-            items(blocks, key = { it.id }) { block ->
-                BlockRow(block, enabled = plan.status == PlanStatus.PENDING) { checked ->
-                    onToggle(block.id, checked)
-                }
+            LinearProgressIndicator(progress = { plan.progress }, modifier = Modifier.fillMaxWidth())
+
+            plan.skipReason?.let {
+                Text(
+                    "Skipped: $it",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
             }
-        }
 
-        if (plan.status == PlanStatus.PENDING) {
-            item {
-                Column(
-                    Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Button(onClick = onComplete, modifier = Modifier.fillMaxWidth()) {
-                        Text("Mark session complete")
+            if (plan.status == PlanStatus.PENDING) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = onReroll, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Default.Casino, contentDescription = null)
+                        Text("  New routine")
                     }
-                    OutlinedButton(onClick = onSkipRequest, modifier = Modifier.fillMaxWidth()) {
-                        Text("Skip today")
+                    if (!plan.isScheduled) {
+                        IconButton(onClick = onDelete) {
+                            Icon(Icons.Default.Delete, contentDescription = "Remove session")
+                        }
                     }
                 }
             }
@@ -215,7 +230,11 @@ private fun BlockRow(block: WorkoutBlock, enabled: Boolean, onToggle: (Boolean) 
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Checkbox(checked = block.completed, onCheckedChange = onToggle, enabled = enabled)
-            Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
+            Column(
+                Modifier
+                    .weight(1f)
+                    .padding(vertical = 8.dp),
+            ) {
                 Text(block.exercise.name, style = MaterialTheme.typography.titleSmall)
                 Text(
                     text = block.prescription +
@@ -234,12 +253,21 @@ private fun BlockRow(block: WorkoutBlock, enabled: Boolean, onToggle: (Boolean) 
 }
 
 @Composable
-private fun RestDay(modifier: Modifier = Modifier) {
+private fun RestDay(isRestDay: Boolean, modifier: Modifier = Modifier) {
     Box(modifier.padding(32.dp), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("Rest day", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
             Text(
-                "Not a training day. Nothing will nag you today.",
+                text = if (isRestDay) "Rest day" else "Nothing scheduled",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                text = if (isRestDay) {
+                    "Nothing will nag you today. Hit the button if you want to train anyway — " +
+                        "it counts as a bonus and can't break your streak."
+                } else {
+                    "Add a session whenever you like."
+                },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

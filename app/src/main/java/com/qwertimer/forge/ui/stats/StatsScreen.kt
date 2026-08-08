@@ -59,6 +59,17 @@ fun StatsScreen(
                 StatTile("${state.stats.completedLast30}", "Done · 30d", Modifier.weight(1f))
             }
 
+            if (state.stats.bonusLast30 > 0) {
+                // Extra sessions sit outside compliance by design, so they get their own line
+                // rather than quietly inflating a percentage that is about the programme.
+                StatTile(
+                    value = "${state.stats.bonusLast30}",
+                    label = "Bonus sessions · 30d",
+                    modifier = Modifier.fillMaxWidth(),
+                    accent = MaterialTheme.colorScheme.primaryContainer,
+                )
+            }
+
             // The uncomfortable half of the picture, deliberately given equal billing.
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 StatTile(

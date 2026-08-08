@@ -27,7 +27,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.qwertimer.forge.domain.model.PlanStatus
 import com.qwertimer.forge.ui.common.MacroSummary
 import com.qwertimer.forge.ui.common.StatTile
 import java.time.format.DateTimeFormatter
@@ -72,11 +71,10 @@ fun HomeScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    if (state.plan?.status == PlanStatus.PENDING) {
-                        Button(onClick = onTrainClick, modifier = Modifier.fillMaxWidth()) {
-                            Icon(Icons.Default.FitnessCenter, contentDescription = null)
-                            Text("  Start session")
-                        }
+                    Button(onClick = onTrainClick, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Default.FitnessCenter, contentDescription = null)
+                        // On a rest day this is the way in to training anyway, so it is never hidden.
+                        Text(if (state.hasPending) "  Start session" else "  Open training")
                     }
                 }
             }

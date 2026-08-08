@@ -97,8 +97,8 @@ private fun EnforcementContent(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val stats by viewModel.stats.collectAsStateWithLifecycle()
-    var skipDialog by remember { mutableStateOf(false) }
-    val plan = state.plan
+    var skipDialog by remember { mutableStateOf<Long?>(null) }
+    val plan = state.scheduled
 
     Column(
         Modifier
@@ -147,23 +147,23 @@ private fun EnforcementContent(
         }
         OutlinedButton(
             onClick = {
-                viewModel.markComplete()
+                viewModel.markComplete(plan.id)
                 onResolved()
             },
             modifier = Modifier.fillMaxWidth(),
         ) { Text("I already did it — mark complete") }
 
-        TextButton(onClick = { skipDialog = true }, modifier = Modifier.fillMaxWidth()) {
+        TextButton(onClick = { skipDialog = plan.id }, modifier = Modifier.fillMaxWidth()) {
             Text("I'm skipping today")
         }
     }
 
-    if (skipDialog) {
+    skipDialog?.let { planId ->
         SkipDialog(
-            onDismiss = { skipDialog = false },
+            onDismiss = { skipDialog = null },
             onConfirm = { reason ->
-                viewModel.skip(reason)
-                skipDialog = false
+                viewModel.skip(planId, reason)
+                skipDialog = null
                 onResolved()
             },
         )

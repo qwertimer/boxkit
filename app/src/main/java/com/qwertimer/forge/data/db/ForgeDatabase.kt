@@ -4,11 +4,14 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverter
 import androidx.room.TypeConverters
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.qwertimer.forge.domain.model.BlockType
 import com.qwertimer.forge.domain.model.BodyRegion
 import com.qwertimer.forge.domain.model.ExerciseCategory
 import com.qwertimer.forge.domain.model.FoodSource
 import com.qwertimer.forge.domain.model.MealType
+import com.qwertimer.forge.domain.model.PlanOrigin
 import com.qwertimer.forge.domain.model.PlanStatus
 import com.qwertimer.forge.domain.model.SessionFocus
 
@@ -41,6 +44,10 @@ class ForgeConverters {
 
     @TypeConverter fun stringToStatus(value: String): PlanStatus = PlanStatus.valueOf(value)
 
+    @TypeConverter fun originToString(value: PlanOrigin): String = value.name
+
+    @TypeConverter fun stringToOrigin(value: String): PlanOrigin = PlanOrigin.valueOf(value)
+
     @TypeConverter fun focusToString(value: SessionFocus): String = value.name
 
     @TypeConverter fun stringToFocus(value: String): SessionFocus = SessionFocus.valueOf(value)
@@ -54,8 +61,8 @@ class ForgeConverters {
         WorkoutPlanEntity::class,
         WorkoutBlockEntity::class,
     ],
-    version = 1,
-    exportSchema = false,
+    version = 2,
+    exportSchema = true,
 )
 @TypeConverters(ForgeConverters::class)
 abstract class ForgeDatabase : RoomDatabase() {
@@ -66,5 +73,26 @@ abstract class ForgeDatabase : RoomDatabase() {
 
     companion object {
         const val NAME = "forge.db"
+
+        /**
+         * v1 allowed exactly one session per day, enforced by a unique index. v2 relaxes that so
+         * a rest day can hold ad-hoc work and a training day can hold a second session, which
+         * means the index becomes non-unique and every existing row is retroactively SCHEDULED —
+         * which is what it was, since v1 had no other kind.
+         */
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE `workout_plans` ADD COLUMN `origin` TEXT NOT NULL " +
+                        "DEFAULT 'SCHEDULED'",
+                )
+                db.execSQL("ALTER TABLE `workout_plans` ADD COLUMN `variant` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("DROP INDEX IF EXISTS `index_workout_plans_epochDay`")
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_workout_plans_epochDay` " +
+                        "ON `workout_plans` (`epochDay`)",
+                )
+            }
+        }
     }
 }

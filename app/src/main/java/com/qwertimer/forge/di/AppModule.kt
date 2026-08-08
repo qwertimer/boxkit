@@ -43,6 +43,9 @@ object AppModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): ForgeDatabase =
         Room.databaseBuilder(context, ForgeDatabase::class.java, ForgeDatabase.NAME)
+            // No fallbackToDestructiveMigration: a missing migration should fail loudly in
+            // development rather than quietly delete somebody's training history.
+            .addMigrations(ForgeDatabase.MIGRATION_1_2)
             .build()
 
     @Provides fun provideFoodDao(db: ForgeDatabase): FoodDao = db.foodDao()

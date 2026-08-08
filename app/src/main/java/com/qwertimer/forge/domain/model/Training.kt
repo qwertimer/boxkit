@@ -34,6 +34,21 @@ enum class PlanStatus {
     SKIPPED,
 }
 
+/**
+ * Where a session came from.
+ *
+ * The distinction matters for the stats: only the programmed session on a training day can be
+ * missed or skipped, so only [SCHEDULED] feeds streaks and compliance. Extra sessions are credit,
+ * never obligation — training on a rest day should not create something new to fail at.
+ */
+enum class PlanOrigin {
+    /** The day's programmed session. At most one per date, and the only one that gets nagged. */
+    SCHEDULED,
+
+    /** Added by hand from the Train screen. Any number, on any day, including rest days. */
+    AD_HOC,
+}
+
 /** Rotating emphasis so consecutive sessions do not hammer the same tissue. */
 enum class SessionFocus(val label: String) {
     FULL_BODY("Full body"),
@@ -88,9 +103,11 @@ data class WorkoutPlan(
     val focus: SessionFocus,
     val status: PlanStatus,
     val estimatedMinutes: Int,
+    val origin: PlanOrigin = PlanOrigin.SCHEDULED,
     val skipReason: String? = null,
     val blocks: List<WorkoutBlock> = emptyList(),
 ) {
+    val isScheduled: Boolean get() = origin == PlanOrigin.SCHEDULED
     val isDone: Boolean get() = status != PlanStatus.PENDING
     val completedBlocks: Int get() = blocks.count { it.completed }
     val progress: Float
@@ -104,6 +121,8 @@ data class ComplianceStats(
     val scheduledLast30: Int,
     val skippedLast30: Int,
     val missedLast30: Int,
+    /** Completed sessions beyond the programme — rest-day work and second sessions. */
+    val bonusLast30: Int = 0,
 ) {
     /** Percentage of scheduled sessions in the last 30 days that were actually completed. */
     val compliancePercent: Int

@@ -22,6 +22,12 @@ data class RoutineRequest(
     val recentlyUsed: Set<String> = emptySet(),
     /** Off by default for anyone with dodgy knees; gates jumping movements. */
     val allowHighImpact: Boolean = true,
+    /**
+     * Distinguishes routines that share a date: a re-roll, or a second session on the same day.
+     * The date alone seeds the generator, so without this every re-roll would hand back the
+     * identical session.
+     */
+    val variant: Int = 0,
 )
 
 data class GeneratedRoutine(
@@ -33,15 +39,16 @@ data class GeneratedRoutine(
 /**
  * Builds a daily session out of the exercise library.
  *
- * The generator is deterministic for a given date: opening the app twice on the same day yields
- * the same routine, so a session can be half-finished and picked up later without it reshuffling
- * underneath you. Variety across days comes from seeding on the date plus steering away from
- * whatever was used in the previous sessions.
+ * The generator is deterministic for a given date and variant: opening the app twice on the same
+ * day yields the same routine, so a session can be half-finished and picked up later without it
+ * reshuffling underneath you. Asking for a new one bumps the variant, which is what makes a
+ * re-roll actually roll. Variety across days comes from the date seed plus steering away from
+ * whatever the previous sessions used.
  */
 class RoutineGenerator(private val library: List<Exercise>) {
 
     fun generate(request: RoutineRequest): GeneratedRoutine {
-        val rng = Random(request.date.toEpochDay())
+        val rng = Random(request.date.toEpochDay() * SEED_STRIDE + request.variant)
         val eligible = library.filter { exercise ->
             exercise.minLevel <= request.level.level &&
                 (request.allowHighImpact || exercise.impact < HIGH_IMPACT)
@@ -233,6 +240,11 @@ class RoutineGenerator(private val library: List<Exercise>) {
     }
 
     companion object {
+        /**
+         * Spreads consecutive dates far apart in the seed space, so no realistic number of
+         * re-rolls on one day can wander into the next day's seed.
+         */
+        private const val SEED_STRIDE = 1_000_003L
         private const val HIGH_IMPACT = 2
         private const val WARMUP_COUNT = 3
         private const val COOLDOWN_COUNT = 2

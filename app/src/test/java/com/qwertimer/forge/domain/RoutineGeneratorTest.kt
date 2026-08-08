@@ -24,7 +24,8 @@ class RoutineGeneratorTest {
         focus: SessionFocus = SessionFocus.FULL_BODY,
         recentlyUsed: Set<String> = emptySet(),
         allowHighImpact: Boolean = true,
-    ) = RoutineRequest(date, level, minutes, focus, recentlyUsed, allowHighImpact)
+        variant: Int = 0,
+    ) = RoutineRequest(date, level, minutes, focus, recentlyUsed, allowHighImpact, variant)
 
     @Test
     fun `session covers cardio, plyometrics and bodyweight`() {
@@ -53,6 +54,39 @@ class RoutineGeneratorTest {
 
         assertThat(first.blocks.map { it.exercise.id })
             .isEqualTo(second.blocks.map { it.exercise.id })
+    }
+
+    @Test
+    fun `a re-roll on the same date produces a different routine`() {
+        // The bug this guards: seeding on the date alone made "new routine" hand back the
+        // identical session, so the button looked broken.
+        val original = generator.generate(request())
+        val rerolled = generator.generate(request(variant = 1))
+
+        assertThat(rerolled.blocks.map { it.exercise.id })
+            .isNotEqualTo(original.blocks.map { it.exercise.id })
+    }
+
+    @Test
+    fun `each variant on a date is distinct`() {
+        val routines = (0..4).map { variant ->
+            generator.generate(request(variant = variant)).blocks.map { it.exercise.id }
+        }
+
+        assertThat(routines.toSet()).hasSize(routines.size)
+    }
+
+    @Test
+    fun `a variant cannot wander into another date's seed`() {
+        // Variants are offset from the date seed by a wide stride; even an absurd number of
+        // re-rolls must not reproduce the next day's session.
+        val tomorrow = generator.generate(request(date = LocalDate.of(2026, 8, 11)))
+            .blocks.map { it.exercise.id }
+
+        (1..50).forEach { variant ->
+            val rolled = generator.generate(request(variant = variant)).blocks.map { it.exercise.id }
+            assertThat(rolled).isNotEqualTo(tomorrow)
+        }
     }
 
     @Test

@@ -22,7 +22,7 @@ Three things:
 ./gradlew :app:assembleDebug        # build
 ./gradlew :app:testDebugUnitTest    # unit tests
 ./gradlew :app:lintDebug            # lint
-adb install app/build/outputs/apk/debug/app-debug.apk
+adb install app/build/outputs/apk/debug/app-arm64-v8a-debug.apk
 ```
 
 The build needs the Android SDK (compileSdk 35, JDK 17). Point `local.properties` at it with
@@ -67,8 +67,9 @@ circuit → finisher → cool-down, with:
 - **Focus rotation** across full body / upper / conditioning / lower, advancing per *training* day
   so a rest day does not shift the cycle.
 - **Variety steering** away from whatever the last two sessions used.
-- **Determinism per date** — opening the app twice on the same day gives you the same routine, so a
-  half-finished session does not reshuffle underneath you.
+- **Determinism per date and variant** — opening the app twice on the same day gives you the same
+  routine, so a half-finished session does not reshuffle underneath you, while asking for a new one
+  bumps the variant so a re-roll genuinely rolls.
 - **Level and impact filters** — beginners never see advanced movements, and turning off high
   impact drops every jumping variation.
 
@@ -94,7 +95,22 @@ The whole chain dies at midnight; tomorrow gets its own first reminder. Rest day
 and never break a streak. A daily `WorkManager` job re-arms everything in case an alarm was dropped
 by a force-stop or an OEM battery manager, and a boot receiver handles reboots and clock changes.
 
-Every part of this is configurable in Settings, including turning the full-screen stage off
+### Training outside the programme
+
+The Train screen always offers a **+**, on any day. On a rest day it reads "Train anyway"; on a day
+that already has a session it reads "Add session". Extra sessions are marked `AD_HOC` and are
+deliberately second-class:
+
+- they are never nagged, and never enforced;
+- they cannot be *missed*, so adding one creates no new way to fail;
+- they sit outside compliance and streaks entirely, surfacing as a separate "bonus sessions" figure
+  on the stats screen rather than inflating a percentage that is about the programme;
+- finishing one does not disarm the day's scheduled reminder.
+
+Any pending session can be re-rolled for a fresh routine, and extras can be deleted outright — only
+the programmed session demands a written reason to skip.
+
+Every part of the enforcement is configurable in Settings, including turning the full-screen stage off
 entirely if you only want to be nagged.
 
 ## Layout
@@ -117,10 +133,14 @@ app/src/main/java/com/qwertimer/forge/
 Kotlin, Jetpack Compose with Material 3, Room, Hilt, WorkManager, CameraX + ML Kit for scanning,
 Retrofit with kotlinx.serialization. minSdk 26, targetSdk 35.
 
-Tests cover the parts where being wrong is expensive and invisible: routine generation, streak and
-compliance arithmetic, reminder scheduling and escalation, Open Food Facts response mapping
-(including the kJ-vs-kcal trap that would quadruple every calorie count), and the Gemini JSON
-extractor.
+APKs are split by ABI, so `assembleDebug` produces `app-arm64-v8a-debug.apk` and an armeabi-v7a
+sibling rather than one universal file.
+
+Tests cover the parts where being wrong is expensive and invisible: routine generation and
+re-rolling, streak and compliance arithmetic, reminder scheduling and escalation, Open Food Facts
+response mapping (including the kJ-vs-kcal trap that would quadruple every calorie count), the
+Gemini JSON extractor, the DAO rules that keep ad-hoc sessions out of compliance, and the schema
+migration — run against a real v1 database so Room's own validation is the assertion.
 
 ## Prior contents of this repository
 

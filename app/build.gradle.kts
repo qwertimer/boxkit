@@ -39,6 +39,9 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
+
+        // Committed schema JSON is the ground truth a migration is written against.
+        ksp { arg("room.schemaLocation", "$projectDir/schemas") }
     }
 
     signingConfigs {

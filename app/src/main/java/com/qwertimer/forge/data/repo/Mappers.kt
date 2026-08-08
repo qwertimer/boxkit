@@ -86,6 +86,7 @@ fun PlanWithBlocks.toDomain(exercisesById: Map<String, Exercise>) = WorkoutPlan(
     focus = plan.focus,
     status = plan.status,
     estimatedMinutes = plan.estimatedMinutes,
+    origin = plan.origin,
     skipReason = plan.skipReason,
     blocks = blocks
         .sortedBy { it.orderIndex }

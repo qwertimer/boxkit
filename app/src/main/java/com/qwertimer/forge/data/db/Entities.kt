@@ -11,6 +11,7 @@ import com.qwertimer.forge.domain.model.BodyRegion
 import com.qwertimer.forge.domain.model.ExerciseCategory
 import com.qwertimer.forge.domain.model.FoodSource
 import com.qwertimer.forge.domain.model.MealType
+import com.qwertimer.forge.domain.model.PlanOrigin
 import com.qwertimer.forge.domain.model.PlanStatus
 import com.qwertimer.forge.domain.model.SessionFocus
 
@@ -94,9 +95,14 @@ data class ExerciseEntity(
     val cue: String,
 )
 
+/**
+ * A session on a date. The index is deliberately not unique: a day holds at most one
+ * [PlanOrigin.SCHEDULED] plan but any number of ad-hoc ones, so that training on a rest day or
+ * doing a second session does not overwrite the record of the first.
+ */
 @Entity(
     tableName = "workout_plans",
-    indices = [Index(value = ["epochDay"], unique = true)],
+    indices = [Index(value = ["epochDay"])],
 )
 data class WorkoutPlanEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0L,
@@ -104,6 +110,9 @@ data class WorkoutPlanEntity(
     val focus: SessionFocus,
     val status: PlanStatus,
     val estimatedMinutes: Int,
+    val origin: PlanOrigin = PlanOrigin.SCHEDULED,
+    /** Seed offset that makes each re-roll and each extra session on a date differ. */
+    val variant: Int = 0,
     val skipReason: String? = null,
     val generatedAt: Long,
     val closedAt: Long? = null,

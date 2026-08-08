@@ -20,10 +20,15 @@ import kotlinx.coroutines.launch
 
 data class WorkoutUiState(
     val loading: Boolean = true,
-    val plan: WorkoutPlan? = null,
+    val sessions: List<WorkoutPlan> = emptyList(),
     val isRestDay: Boolean = false,
-    val stats: ComplianceStats? = null,
-)
+    val working: Boolean = false,
+) {
+    /** The programmed session, if today is a training day. */
+    val scheduled: WorkoutPlan? get() = sessions.firstOrNull { it.isScheduled }
+
+    val extras: List<WorkoutPlan> get() = sessions.filterNot { it.isScheduled }
+}
 
 @HiltViewModel
 class WorkoutViewModel @Inject constructor(
@@ -48,34 +53,55 @@ class WorkoutViewModel @Inject constructor(
             _state.update { it.copy(isRestDay = !config.isTrainingDay(today.dayOfWeek)) }
         }
         viewModelScope.launch {
-            training.planFor(today).collect { plan ->
-                _state.update { it.copy(loading = false, plan = plan) }
+            training.sessionsFor(today).collect { sessions ->
+                _state.update { it.copy(loading = false, sessions = sessions) }
             }
         }
     }
+
+    /** Add a session on top of whatever today already has — including on a rest day. */
+    fun addSession() = work { training.addSession(today) }
+
+    fun reroll(planId: Long) = work { training.reroll(planId) }
+
+    fun deleteSession(planId: Long) = work { training.deleteSession(planId) }
 
     fun toggleBlock(blockId: Long, completed: Boolean) {
         viewModelScope.launch { training.setBlockCompleted(blockId, completed) }
     }
 
-    fun markComplete() {
-        val planId = _state.value.plan?.id ?: return
+    fun markComplete(planId: Long) {
         viewModelScope.launch {
             training.markCompleted(planId)
-            // Stop the escalation immediately rather than waiting for the next alarm to notice.
-            scheduler.scheduleNextReminder()
+            resettleAlarmsIfScheduled(planId)
         }
     }
 
-    fun skip(reason: String) {
-        val planId = _state.value.plan?.id ?: return
+    fun skip(planId: Long, reason: String) {
         viewModelScope.launch {
             training.markSkipped(planId, reason)
+            resettleAlarmsIfScheduled(planId)
+        }
+    }
+
+    /**
+     * Only closing out the *programmed* session ends today's escalation. Finishing a bonus session
+     * must not, or one keen rest-day workout would silently disarm the nag for a training day.
+     */
+    private suspend fun resettleAlarmsIfScheduled(planId: Long) {
+        if (_state.value.sessions.firstOrNull { it.id == planId }?.isScheduled == true) {
             scheduler.scheduleNextReminder()
         }
     }
 
-    fun regenerate() {
-        viewModelScope.launch { training.regenerate(today) }
+    private fun work(block: suspend () -> Unit) {
+        viewModelScope.launch {
+            _state.update { it.copy(working = true) }
+            try {
+                block()
+            } finally {
+                _state.update { it.copy(working = false) }
+            }
+        }
     }
 }
